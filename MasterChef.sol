@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-import "./OliveToken.sol";
+import "./YuccaToken.sol";
 
 contract MasterChef is Ownable, ReentrancyGuard {
     using SafeMath for uint256;
@@ -23,14 +23,14 @@ contract MasterChef is Ownable, ReentrancyGuard {
     // Info of each pool.
     struct PoolInfo {
         IERC20 lpToken;           // Address of LP token contract.
-        uint256 allocPoint;       // How many allocation points assigned to this pool. OLIVE to distribute per block.
-        uint256 lastRewardBlock;  // Last block number that OLIVE distribution occurs.
-        uint256 accOlivePerShare;   // Accumulated OLIVE per share, times 1e12. See below.
+        uint256 allocPoint;       // How many allocation points assigned to this pool. YUCCA to distribute per block.
+        uint256 lastRewardBlock;  // Last block number that YUCCA distribution occurs.
+        uint256 accYuccaPerShare;   // Accumulated YUCCA per share, times 1e12. See below.
     }
 
-    OliveToken public olive;
+    YuccaToken public yucca;
     address public devaddr;
-    uint256 public olivePerBlock;
+    uint256 public yuccaPerBlock;
     uint256 public constant BONUS_MULTIPLIER = 1;
 
     PoolInfo[] public poolInfo;
@@ -42,17 +42,17 @@ contract MasterChef is Ownable, ReentrancyGuard {
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event SetDevAddress(address indexed user, address indexed newAddress);
-    event UpdateEmissionRate(address indexed user, uint256 olivePerBlock);
+    event UpdateEmissionRate(address indexed user, uint256 yuccaPerBlock);
 
     constructor(
-        OliveToken _olive,
+        YuccaToken _yucca,
         address _devaddr,
-        uint256 _olivePerBlock,
+        uint256 _yuccaPerBlock,
         uint256 _startBlock
     ) public {
-        olive = _olive;
+        yucca = _yucca;
         devaddr = _devaddr;
-        olivePerBlock = _olivePerBlock;
+        yuccaPerBlock = _yuccaPerBlock;
         startBlock = _startBlock;
     }
 
@@ -83,11 +83,11 @@ contract MasterChef is Ownable, ReentrancyGuard {
         lpToken : _lpToken,
         allocPoint : _allocPoint,
         lastRewardBlock : lastRewardBlock,
-        accOlivePerShare : 0
+        accYuccaPerShare : 0
         }));
     }
 
-    // Update the given pool's OLIVE allocation point and deposit fee. Can only be called by the owner.
+    // Update the given pool's YUCCA allocation point and deposit fee. Can only be called by the owner.
     function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate) public onlyOwner poolExists(_pid) {
         if (_withUpdate) {
             massUpdatePools();
@@ -101,18 +101,18 @@ contract MasterChef is Ownable, ReentrancyGuard {
         return _to.sub(_from).mul(BONUS_MULTIPLIER);
     }
 
-    // View function to see pending OLIVEs on frontend.
-    function pendingOlive(uint256 _pid, address _user) external view returns (uint256) {
+    // View function to see pending YUCCAs on frontend.
+    function pendingYucca(uint256 _pid, address _user) external view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
-        uint256 accOlivePerShare = pool.accOlivePerShare;
+        uint256 accYuccaPerShare = pool.accYuccaPerShare;
         uint256 lpSupply = pool.lpToken.balanceOf(address(this));
         if (block.number > pool.lastRewardBlock && lpSupply != 0) {
             uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
-            uint256 oliveReward = multiplier.mul(olivePerBlock).mul(pool.allocPoint).div(totalAllocPoint);
-            accOlivePerShare = accOlivePerShare.add(oliveReward.mul(1e12).div(lpSupply));
+            uint256 yuccaReward = multiplier.mul(yuccaPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
+            accYuccaPerShare = accYuccaPerShare.add(yuccaReward.mul(1e12).div(lpSupply));
         }
-        return user.amount.mul(accOlivePerShare).div(1e12).sub(user.rewardDebt);
+        return user.amount.mul(accYuccaPerShare).div(1e12).sub(user.rewardDebt);
     }
 
     // Update reward variables for all pools. Be careful of gas spending!
@@ -135,29 +135,29 @@ contract MasterChef is Ownable, ReentrancyGuard {
             return;
         }
         uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
-        uint256 oliveReward = multiplier.mul(olivePerBlock).mul(pool.allocPoint).div(totalAllocPoint);
-        olive.mint(devaddr, oliveReward.mul(888).div(10000));
-        olive.mint(address(this), oliveReward);
-        pool.accOlivePerShare = pool.accOlivePerShare.add(oliveReward.mul(1e12).div(lpSupply));
+        uint256 yuccaReward = multiplier.mul(yuccaPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
+        yucca.mint(devaddr, yuccaReward.mul(888).div(10000));
+        yucca.mint(address(this), yuccaReward);
+        pool.accYuccaPerShare = pool.accYuccaPerShare.add(yuccaReward.mul(1e12).div(lpSupply));
         pool.lastRewardBlock = block.number;
     }
 
-    // Deposit LP tokens to MasterChef for OLIVE allocation.
+    // Deposit LP tokens to MasterChef for YUCCA allocation.
     function deposit(uint256 _pid, uint256 _amount) public nonReentrant poolExists(_pid) {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         updatePool(_pid);
         if (user.amount > 0) {
-            uint256 pending = user.amount.mul(pool.accOlivePerShare).div(1e12).sub(user.rewardDebt);
+            uint256 pending = user.amount.mul(pool.accYuccaPerShare).div(1e12).sub(user.rewardDebt);
             if (pending > 0) {
-                safeOliveTransfer(msg.sender, pending);
+                safeYuccaTransfer(msg.sender, pending);
             }
         }
         if (_amount > 0) {
             pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
             user.amount = user.amount.add(_amount);
         }
-        user.rewardDebt = user.amount.mul(pool.accOlivePerShare).div(1e12);
+        user.rewardDebt = user.amount.mul(pool.accYuccaPerShare).div(1e12);
         emit Deposit(msg.sender, _pid, _amount);
     }
 
@@ -167,15 +167,15 @@ contract MasterChef is Ownable, ReentrancyGuard {
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
         updatePool(_pid);
-        uint256 pending = user.amount.mul(pool.accOlivePerShare).div(1e12).sub(user.rewardDebt);
+        uint256 pending = user.amount.mul(pool.accYuccaPerShare).div(1e12).sub(user.rewardDebt);
         if (pending > 0) {
-            safeOliveTransfer(msg.sender, pending);
+            safeYuccaTransfer(msg.sender, pending);
         }
         if (_amount > 0) {
             user.amount = user.amount.sub(_amount);
             pool.lpToken.safeTransfer(address(msg.sender), _amount);
         }
-        user.rewardDebt = user.amount.mul(pool.accOlivePerShare).div(1e12);
+        user.rewardDebt = user.amount.mul(pool.accYuccaPerShare).div(1e12);
         emit Withdraw(msg.sender, _pid, _amount);
     }
 
@@ -190,16 +190,16 @@ contract MasterChef is Ownable, ReentrancyGuard {
         emit EmergencyWithdraw(msg.sender, _pid, amount);
     }
 
-    // Safe OLIVE transfer function, just in case if rounding error causes pool to not have enough OLIVEs.
-    function safeOliveTransfer(address _to, uint256 _amount) internal {
-        uint256 oliveBal = olive.balanceOf(address(this));
+    // Safe YUCCA transfer function, just in case if rounding error causes pool to not have enough YUCCAs.
+    function safeYuccaTransfer(address _to, uint256 _amount) internal {
+        uint256 yuccaBal = yucca.balanceOf(address(this));
         bool transferSuccess = false;
-        if (_amount > oliveBal) {
-            transferSuccess = olive.transfer(_to, oliveBal);
+        if (_amount > yuccaBal) {
+            transferSuccess = yucca.transfer(_to, yuccaBal);
         } else {
-            transferSuccess = olive.transfer(_to, _amount);
+            transferSuccess = yucca.transfer(_to, _amount);
         }
-        require(transferSuccess, "safeOliveTransfer: transfer failed");
+        require(transferSuccess, "safeYuccaTransfer: transfer failed");
     }
 
     // Update dev address by the previous dev.
